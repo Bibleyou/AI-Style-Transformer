@@ -6,7 +6,7 @@ import LoadingOverlay from './components/LoadingOverlay';
 
 const App: React.FC = () => {
   const [image, setImage] = useState<string | null>(null);
-  const [result, setResult] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<TransformationConfig>({
@@ -25,65 +25,61 @@ const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (event) => {
         setImage(event.target?.result as string);
-        setResult(null);
+        setAnalysis(null);
         setError(null);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const transformImage = async () => {
+  const analyzeStyle = async () => {
     if (!image) return;
+    
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      setError("API Key não encontrada. Verifique as configurações.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const ai = new GoogleGenAI({ apiKey });
       const base64Data = image.split(',')[1];
       const mimeType = image.split(';')[0].split(':')[1];
 
-      const musicalInfluence = config.musicalStyle !== MusicalStyle.NONE 
-        ? `Adicione uma forte influência estética do estilo musical ${config.musicalStyle}.` 
-        : "";
+      // Usando o Gemini 3 Flash que é gratuito no AI Studio (Free Tier)
+      const prompt = `Analise esta foto e crie um ROTEIRO DE ESTILO VIRAL para o TikTok.
+      ESTILO ESCOLHIDO: ${config.style}
+      INFLUÊNCIA MUSICAL: ${config.musicalStyle}
+      CENÁRIO: ${config.scenario}
+      POSE SUGERIDA: ${config.pose}
+      ACESSÓRIOS: ${config.accessories.join(', ')}
 
-      const prompt = `Gere uma nova imagem profissional de alta resolução da mesma pessoa na foto de referência.
-      MODIFICAÇÕES:
-      1. Roupas: Alterar para o estilo ${config.style}. ${musicalInfluence}
-      2. Cenário: Mudar o fundo para ${config.scenario}.
-      3. Pose: Ajustar para ${config.pose}.
-      4. Acessórios: Incluir ${config.accessories.join(', ')}.
+      Responda em Markdown estruturado:
+      1. **Análise de Biotipo**: O que combina com a pessoa da foto.
+      2. **O Look Ideal**: Descreva peça por peça (ex: 'Calça cargo bege com fivelas').
+      3. **Dica de Iluminação**: Como usar o cenário ${config.scenario}.
+      4. **Legenda Viral**: Sugira 2 legendas com hashtags.
+      5. **Dica de Áudio**: Que tipo de música usar.
       
-      REGRAS CRÍTICAS:
-      - Mantenha a identidade facial e características físicas da pessoa exatamente iguais.
-      - Estilo fotográfico realista com iluminação suave de alta qualidade (TikTok aesthetic).
-      - Cores vivas e saturadas.
-      - Se o estilo musical for Sertanejo ou Vaquejada, incorpore elementos como botas e detalhes em couro de forma moderna.
-      - Se for Funk, use estética "mandrake" ou de grife urbana com acessórios chamativos.
-      - A imagem deve parecer um frame estático de um vídeo viral.`;
+      Seja muito criativo, jovem e use gírias de TikTok.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
+        model: 'gemini-3-flash-preview',
+        contents: [{
           parts: [
             { inlineData: { data: base64Data, mimeType } },
             { text: prompt }
-          ],
-        },
+          ]
+        }],
       });
 
-      const parts = response.candidates?.[0]?.content?.parts;
-      if (parts) {
-        const imagePart = parts.find(p => p.inlineData);
-        if (imagePart?.inlineData) {
-          setResult(`data:image/png;base64,${imagePart.inlineData.data}`);
-        } else {
-          throw new Error("Não foi possível gerar a imagem. Tente novamente.");
-        }
-      }
+      setAnalysis(response.text);
     } catch (err: any) {
       console.error(err);
-      setError("Erro ao processar imagem: " + (err.message || "Serviço temporariamente indisponível."));
+      setError("Erro na consultoria: " + (err.message || "Tente novamente mais tarde."));
     } finally {
       setLoading(false);
     }
@@ -99,70 +95,46 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pb-20">
-      {loading && <LoadingOverlay message="Criando seu look viral..." />}
+    <div className="min-h-screen pb-20 bg-slate-50">
+      {loading && <LoadingOverlay message="IA Analisando seu potencial viral..." />}
       
-      <header className="sticky top-0 z-40 bg-black/90 text-white py-4 px-6 shadow-xl backdrop-blur-md">
+      <header className="sticky top-0 z-40 bg-black text-white py-4 px-6 shadow-xl">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-white p-2 rounded-lg">
-              <i className="fa-brands fa-tiktok text-black text-xl"></i>
+            <div className="tiktok-gradient p-2 rounded-lg">
+              <i className="fa-brands fa-tiktok text-white text-xl"></i>
             </div>
-            <h1 className="text-xl font-extrabold tracking-tight">AI Style Transformer</h1>
+            <h1 className="text-xl font-extrabold tracking-tight">TikTok Style Guide</h1>
           </div>
-          <div className="hidden sm:block text-xs uppercase tracking-widest text-gray-400 font-bold">
-            TikTok Edition
-          </div>
+          <span className="bg-green-500 text-[10px] px-2 py-1 rounded-full font-bold">GRÁTIS / FREE TIER</span>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 mt-8 space-y-8">
-        {/* Step 1: Image Upload */}
+        {/* Step 1: Upload */}
         <section className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3 mb-6">
             <span className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold">1</span>
-            <h2 className="text-xl font-bold">Foto de Referência</h2>
+            <h2 className="text-xl font-bold">Sua Foto Atual</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className={`border-3 border-dashed rounded-2xl aspect-square flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-gray-50 group ${image ? 'border-green-400' : 'border-gray-200'}`}
+              className={`border-3 border-dashed rounded-2xl aspect-video flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-gray-50 ${image ? 'border-green-400' : 'border-gray-200'}`}
             >
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileUpload} 
-                accept="image/*" 
-                className="hidden" 
-              />
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
               {image ? (
                 <img src={image} className="w-full h-full object-cover rounded-xl" alt="Preview" />
               ) : (
-                <>
-                  <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <i className="fa-solid fa-camera text-gray-400 text-2xl"></i>
-                  </div>
-                  <p className="font-bold text-gray-600">Toque para enviar</p>
-                  <p className="text-sm text-gray-400 mt-1">Sua foto atual</p>
-                </>
+                <div className="text-center">
+                  <i className="fa-solid fa-cloud-arrow-up text-gray-300 text-3xl mb-2"></i>
+                  <p className="font-bold text-gray-400">Clique para enviar</p>
+                </div>
               )}
             </div>
-
-            <div className="flex flex-col justify-center space-y-4">
-              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-xl">
-                <p className="text-sm text-blue-800 font-medium">
-                  Dica: Use uma foto nítida para manter sua identidade visual.
-                </p>
-              </div>
-              {image && (
-                <button 
-                  onClick={() => setImage(null)}
-                  className="text-red-500 font-bold text-sm hover:underline w-fit"
-                >
-                  Remover Foto
-                </button>
-              )}
+            <div className="text-sm text-gray-500 flex flex-col justify-center italic">
+              "Nossa IA vai analisar sua foto e criar o guia completo de como você deve se vestir e se comportar para viralizar."
             </div>
           </div>
         </section>
@@ -171,71 +143,41 @@ const App: React.FC = () => {
         <section className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3 mb-6">
             <span className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold">2</span>
-            <h2 className="text-xl font-bold">Configurar Transformação</h2>
+            <h2 className="text-xl font-bold">O Que Você Quer Ser?</h2>
           </div>
 
           <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Base do Vestuário</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Object.values(ClothingStyle).map((style) => (
-                  <button
-                    key={style}
-                    onClick={() => setConfig(prev => ({ ...prev, style }))}
-                    className={`px-4 py-3 rounded-xl text-left font-semibold text-sm transition-all border-2 ${config.style === style ? 'border-[#FE2C55] bg-[#FE2C55]/5 text-[#FE2C55]' : 'border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-300'}`}
-                  >
-                    {style}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Influência Musical</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {Object.values(MusicalStyle).map((mStyle) => (
-                  <button
-                    key={mStyle}
-                    onClick={() => setConfig(prev => ({ ...prev, musicalStyle: mStyle }))}
-                    className={`px-3 py-2 rounded-xl text-center font-bold text-xs transition-all border-2 ${config.musicalStyle === mStyle ? 'border-[#25F4EE] bg-[#25F4EE]/5 text-teal-700' : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-300'}`}
-                  >
-                    {mStyle.split(' (')[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Cenário</label>
+                <label className="text-xs font-bold text-gray-400 uppercase">Estilo Base</label>
                 <select 
-                  value={config.scenario}
-                  onChange={(e) => setConfig(prev => ({ ...prev, scenario: e.target.value as Scenario }))}
-                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 font-semibold focus:border-black outline-none appearance-none"
+                  value={config.style}
+                  onChange={(e) => setConfig(prev => ({ ...prev, style: e.target.value as ClothingStyle }))}
+                  className="w-full mt-1 bg-gray-50 border-2 border-gray-100 rounded-xl p-3 font-semibold outline-none"
                 >
-                  {Object.values(Scenario).map(s => <option key={s} value={s}>{s}</option>)}
+                  {Object.values(ClothingStyle).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Pose</label>
+                <label className="text-xs font-bold text-gray-400 uppercase">Ritmo Musical</label>
                 <select 
-                  value={config.pose}
-                  onChange={(e) => setConfig(prev => ({ ...prev, pose: e.target.value as Pose }))}
-                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 font-semibold focus:border-black outline-none appearance-none"
+                  value={config.musicalStyle}
+                  onChange={(e) => setConfig(prev => ({ ...prev, musicalStyle: e.target.value as MusicalStyle }))}
+                  className="w-full mt-1 bg-gray-50 border-2 border-gray-100 rounded-xl p-3 font-semibold outline-none"
                 >
-                  {Object.values(Pose).map(p => <option key={p} value={p}>{p}</option>)}
+                  {Object.values(MusicalStyle).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Acessórios</label>
-              <div className="flex flex-wrap gap-2">
-                {['Óculos de sol', 'Boné', 'Fones', 'Brincos', 'Relógio', 'Mochila', 'Chapéu de Couro'].map(acc => (
+              <label className="text-xs font-bold text-gray-400 uppercase">Acessórios Desejados</label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {['Óculos Juliet', 'Corrente de Ouro', 'Chapéu Boiadeiro', 'Fone Gamer', 'Shoulder Bag'].map(acc => (
                   <button
                     key={acc}
                     onClick={() => toggleAccessory(acc)}
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all border-2 ${config.accessories.includes(acc) ? 'border-black bg-black text-white' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${config.accessories.includes(acc) ? 'bg-black text-white border-black' : 'border-gray-100 text-gray-400'}`}
                   >
                     {acc}
                   </button>
@@ -245,46 +187,37 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {error && (
-          <div className="bg-red-50 border-2 border-red-100 text-red-600 p-4 rounded-2xl flex items-center gap-3">
-            <i className="fa-solid fa-circle-exclamation"></i>
-            <span className="font-semibold text-sm">{error}</span>
-          </div>
-        )}
-
         <button
-          onClick={transformImage}
+          onClick={analyzeStyle}
           disabled={!image || loading}
-          className={`w-full py-5 rounded-2xl font-black text-lg shadow-xl transform transition-all active:scale-95 flex items-center justify-center gap-3 ${!image || loading ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'tiktok-gradient text-white hover:brightness-110'}`}
+          className={`w-full py-4 rounded-2xl font-black text-lg shadow-lg flex items-center justify-center gap-3 transition-all ${!image || loading ? 'bg-gray-200 text-gray-400' : 'tiktok-gradient text-white hover:scale-[1.02]'}`}
         >
-          {loading ? 'Processando Estilo...' : 'GERAR LOOK VIRAL'}
-          <i className="fa-solid fa-wand-magic-sparkles"></i>
+          {loading ? 'ANALISANDO...' : 'CRIAR MEU ROTEIRO DE ESTILO'}
+          <i className="fa-solid fa-bolt"></i>
         </button>
 
-        {result && (
-          <section className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 animate-in fade-in zoom-in duration-500">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full bg-[#FE2C55] text-white flex items-center justify-center font-bold">✨</span>
-                <h2 className="text-xl font-bold">Resultado AI</h2>
-              </div>
-              <a 
-                href={result} 
-                download="tiktok-style-ai.png"
-                className="text-black font-bold text-sm flex items-center gap-2 hover:underline"
-              >
-                <i className="fa-solid fa-download"></i> Baixar
-              </a>
+        {analysis && (
+          <section className="bg-white rounded-3xl p-8 shadow-2xl border-t-4 border-[#FE2C55] animate-in slide-in-from-bottom duration-500">
+            <h2 className="text-2xl font-black mb-6 flex items-center gap-3">
+              <i className="fa-solid fa-star text-yellow-400"></i>
+              Seu Plano para Viralizar
+            </h2>
+            <div className="prose prose-slate max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {analysis}
             </div>
-            <div className="rounded-2xl overflow-hidden shadow-2xl bg-gray-900 border-4 border-white">
-              <img src={result} className="w-full h-auto" alt="Resultado AI" />
+            <div className="mt-8 p-4 bg-gray-50 rounded-2xl text-center">
+              <p className="text-xs font-bold text-gray-400 uppercase mb-2">Compartilhe esse roteiro</p>
+              <div className="flex justify-center gap-4">
+                <button className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><i className="fa-brands fa-whatsapp"></i></button>
+                <button className="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center"><i className="fa-brands fa-instagram"></i></button>
+              </div>
             </div>
           </section>
         )}
       </main>
 
-      <footer className="mt-12 text-center text-gray-400 text-sm font-medium">
-        Criado com IA Gemini 2.5 • Estética Musical TikTok
+      <footer className="text-center py-10 text-gray-400 text-xs font-bold tracking-widest uppercase">
+        Powered by Gemini 3 Flash (Free Tier)
       </footer>
     </div>
   );
