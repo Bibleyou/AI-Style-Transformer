@@ -1,0 +1,7 @@
+{
+  "name": "TikTok AI Style Transformer",
+  "description": "Transform any portrait into a viral TikTok influencer look. Change clothes, backgrounds, and poses while maintaining the subject's identity using advanced Gemini image editing.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
